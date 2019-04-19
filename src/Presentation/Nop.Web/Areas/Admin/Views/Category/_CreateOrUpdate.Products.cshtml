@@ -3,58 +3,275 @@
 @if (Model.Id > 0)
 {
 <div class="panel-body">
-    @await Html.PartialAsync("Table", new DataTablesModel
-    {
-        Name = "products-grid",
-        UrlRead = new DataUrl("ProductList", "Category", null),
-        UrlDelete = new DataUrl("ProductDelete", "Category", null),
-        Length = Model.CategoryProductSearchModel.PageSize,
-        LengthMenu = Model.CategoryProductSearchModel.AvailablePageSizes,
-        Filters = new List<FilterParameter>
-        {
-            new FilterParameter(nameof(Model.CategoryProductSearchModel.CategoryId), Model.CategoryProductSearchModel.CategoryId)
-        },
-        ColumnCollection = new List<ColumnProperty>
-        {
-            new ColumnProperty(nameof(CategoryProductModel.ProductName))
-            {
-                Title = T("Admin.Catalog.Categories.Products.Fields.Product").Text
-            },
-            new ColumnProperty(nameof(CategoryProductModel.IsFeaturedProduct))
-            {
-                Title = T("Admin.Catalog.Categories.Products.Fields.IsFeaturedProduct").Text,
-                Width = "150",
-                ClassName = StyleColumn.CenterAll,
-                Render = new RenderBoolean()
-            },
-            new ColumnProperty(nameof(CategoryProductModel.DisplayOrder))
-            {
-                Title = T("Admin.Catalog.Categories.Products.Fields.DisplayOrder").Text,
-                Width = "150"
-            },
-            new ColumnProperty(nameof(CategoryProductModel.Id))
-            {
-                Title = T("Admin.Common.View").Text,
-                Width = "150",
-                ClassName = StyleColumn.ButtonStyle,
-                Render = new RenderButtonView(new DataUrl("~/Admin/Product/Edit/", nameof(CategoryProductModel.ProductId)))
-            },
-            new ColumnProperty(nameof(CategoryProductModel.Id))
-            {
-                Title = T("Admin.Common.Edit").Text,
-                Width = "100",
-                ClassName =  StyleColumn.ButtonStyle,
-                Render = new RenderButtonEdit(new DataUrl("Edit"))
-            },
-            new ColumnProperty(nameof(CategoryProductModel.Id))
-            {
-                Title = T("Admin.Common.Delete").Text,
-                Width = "100",
-                Render = new RenderButtonRemove(T("Admin.Common.Delete").Text){ Style = StyleButton.Default },
-                ClassName = StyleColumn.ButtonStyle
+    <table id="dtexample" class="table table-bordered table-hover dataTable" width="100%" border="1px" cellpadding="0px" width="auto" cellspacing="0px">
+        <thead id="headD">
+            <tr></tr>
+            @*<tr></tr>*@
+        </thead>
+        <tbody id="dataD" runat="server"></tbody>
+    </table>
+    <script type="text/javascript">
+        var mdataArray = [];
+        var EditRowData = [];
+        var ColumnData;
+        var table;
+        var defaultcol = "";
+        //get Table and Columns properties
+        function getTableMeta() {
+            data = {
+                "Column": [{ "Name": "@nameof(CategoryProductModel.ProductName)", "Editable": true, "Searchable": true, "Class": "@nameof(CategoryProductModel.ProductName)" },
+                    { "Name": "@nameof(CategoryProductModel.IsFeaturedProduct)", "Editable": true, "Searchable": true, "Class": "@nameof(CategoryProductModel.IsFeaturedProduct)" },
+                    { "Name": "@nameof(CategoryProductModel.DisplayOrder)", "Editable": true, "Searchable": true, "Class": "@nameof(CategoryProductModel.DisplayOrder)" },
+                    { "Name": "@nameof(CategoryProductModel.ProductId)", "Editable": false, "Searchable": false, "Class": "@nameof(CategoryProductModel.ProductId)" },
+                    { "Name": "@nameof(CategoryProductModel.Id)", "Editable": false, "Searchable": false, "Class": "@nameof(CategoryProductModel.Id)" }],
+                "Name": "TableNameHere"
+            }
+            console.log(data);
+            ColumnData = data.Column;
+            $.each(data.Column, function (index, element) {
+                $('#dtexample thead tr:first-child').append($('<th>', {
+                    text: element.Name
+                }));
+                if (element.Searchable == true)
+                    $('#dtexample thead tr:nth-child(2)').append($('<th>', {
+                        text: element.Name
+                    }));
+                else $('#dtexample thead tr:nth-child(2)').append($('<th>', {
+                    text: ''
+                }));
+                mdataArray.push({ mData: element.Name, class: element.Name });
+            });
+            defaultcol = data.Column[0].Name;
+            //once table headers and table data property set, initialize DT
+            initializeDataTable();
+        }
+
+        $(document).ready(function () {
+            getTableMeta();
+        });
+
+        $(document).keyup(function (e) {
+            if (e.keyCode == 27)
+                cancelBtn();
+        });
+
+        function initializeDataTable() {
+            //put Input textbox for filtering
+            $('#dtexample thead tr:nth-child(2) th').each(function () {
+                var title = $(this).text();
+                if (title != '')
+                    $(this).html('<input type="text" class="sorthandle" style="width:100%;" />');
+            });
+            //don't sort when user clicks on input textbox to type for filter
+            $('#dtexample').find('thead th').click(function (event) {
+                if ($(event.target).hasClass('sorthandle')) {
+                    event.stopImmediatePropagation()
+                }
+            });
+            table = $('#dtexample').DataTable({
+                ajax:
+                {
+                    url: '@Html.Raw(Url.Action("ProductList", "Category"))',
+                    type: 'POST',
+                    dataType: 'json',
+                    dataSrc: 'Data',
+                    data: function() {
+					            var data = {
+					                CategoryId: '@(Model.Id)'
+					            };
+					            addAntiForgeryToken(data);
+					            return data;
+					        }
+                },
+                "lengthMenu": [10, 50, 100], "searching": true,
+                //rowId required when doing update, can put any unique value for each row instead of ID
+                rowId: 'Id',
+                serverSide: true, "processing": true,
+                aoColumns: mdataArray
+            });
+            //call search api when user types in filter input
+            table.columns().every(function () {
+                var that = this;
+                $('input', this.header()).on('keyup change', function () {
+                    if (that.search() !== this.value) {
+                        that.search(this.value).draw();
+                    }
+                });
+            });
+            var onEditClickcls = '';
+            $.each(ColumnData, function (index, element) {
+                if (element.Editable == true) {
+                    onEditClickcls += 'tr td.' + element.Name + ',';
+                }
+            });
+            onEditClickcls = onEditClickcls.substring(0, onEditClickcls.length - 1);
+            console.log(onEditClickcls);
+            $("#dtexample tbody").on('click', onEditClickcls, function (e) {
+                if ($(e.target).is('input') || $(e.target).is('img') || $(e.target).is('span.copyAll')) {
+                    e.preventDefault();
+                    return;
+                }
+                RoweditMode($(this).parent());
+            });
+            $("#dtexample tbody").on('keyup', 'input.userinput', function (e) {
+                if (e.keyCode == 35) {
+                    console.log('Нажата кнопка END');
+                    updateRowData(this.parentNode.parentNode);
+                }
+            });
+        }
+        var editIndexTable = -1;
+        function RoweditMode(rowid) {
+            var prevRow;
+            var rowIndexVlaue = parseInt(rowid.attr("indexv"));
+            if (editIndexTable == -1) {
+                saveRowIntoArray(rowid);
+                rowid.attr("editState", "editState");
+                editIndexTable = rowid.rowIndex;
+                setEditStateValue(rowid, rowIndexVlaue + 2);
+            }
+            else {
+                prevRow = $("[editState=editState]");
+                prevRow.attr("editState", "");
+                rowid.attr("editState", "editState");
+                editIndexTable = rowIndexVlaue;
+                saveArrayIntoRow(prevRow);
+                saveRowIntoArray(rowid);
+                setEditStateValue(rowid, rowIndexVlaue + 2);
             }
         }
-    })
+        function setEditStateValue(td1, indexRow) {
+            for (var k in EditRowData) {
+                $($(td1).children('.' + k)[0]).html('<input value="' + EditRowData[k] + '" class="userinput"  style="width: 99% " />');
+            }
+        }
+        function cancelBtn() {
+            var prevRow = $("[editState=editState]");
+            prevRow.attr("editState", "");
+            if (prevRow.length > 0) { saveArrayIntoRow($(prevRow)); }
+            editIndexTable = -1;
+        }
+        function saveRowIntoArray(cureentCells) {
+            $.each(ColumnData, function (index, element) {
+                if (element.Editable == true) {
+                    var htmlVal = $($(cureentCells).children('.' + element.Name)[0]).html();
+                    EditRowData[element.Name] = htmlVal;
+                }
+            });
+        }
+        function saveArrayIntoRow(cureentCells) {
+            for (var k in EditRowData) {
+                $($(cureentCells).children('.' + k)[0]).html(EditRowData[k]);
+            }
+        }
+        function updateRowData(currentCells) {
+            var table = $("#dtexample").DataTable();
+            var row = table.row(currentCells);
+            rowid = currentCells.getAttribute('id');
+            var UpdateRowData = [];
+            $.each(ColumnData, function (index, element) {
+                if (element.Editable == true) {
+                    UpdateRowData.push({
+                        'pname': element.Name, 'pvalue': $($($(currentCells).children('.' + element.Name)).children('input')[0]).val()
+                    });
+                }
+            });
+            console.log(UpdateRowData);
+            UpdateRowData.push({ 'pname': 'Id', 'pvalue': rowid });
+            var parameter = "";
+            var DataId = "";
+            var postData = {};
+            for (i = 0; i < UpdateRowData.length; i++) {
+                if (UpdateRowData[i].pname == 'Id') {
+                    //postData.push({ name: 'ProductId', value: UpdateRowData[i].pvalue });
+                    postData['ProductId'] = UpdateRowData[i].pvalue;
+                    DataId = UpdateRowData[i].pvalue;
+                }
+                postData[UpdateRowData[i].pname] = UpdateRowData[i].pvalue;
+                //postData.push({ name: UpdateRowData[i].pname, value: UpdateRowData[i].pvalue });
+
+            }
+
+            postData['CategoryId'] = 3;
+            //postData.push({ name: 'CategoryId', value: 7 });
+
+
+            var tokenInput = $('input[name=__RequestVerificationToken]').val();
+            //postData.push({ name: '__RequestVerificationToken', value: tokenInput });
+            postData['__RequestVerificationToken'] = tokenInput;
+
+            addAntiForgeryToken(postData);
+            console.log("POST_DATA: " + postData);
+
+            $.ajax({
+                type: 'POST',
+                url: '@Html.Raw(Url.Action("ProductUpdate", "Category"))',
+                //data: parameter,
+                data: postData,
+                success: function (data) {
+                    console.log("TTTTT");
+                    var table = $('#dtexample').DataTable().ajax.reload();
+                    //table.draw('page');
+                }
+            });
+        }
+
+    </script>
+
+
+
+    @*@await Html.PartialAsync("Table", new DataTablesModel
+        {
+            Name = "products-grid",
+            UrlRead = new DataUrl("ProductList", "Category", null),
+            UrlDelete = new DataUrl("ProductDelete", "Category", null),
+            Length = Model.CategoryProductSearchModel.PageSize,
+            LengthMenu = Model.CategoryProductSearchModel.AvailablePageSizes,
+            Filters = new List<FilterParameter>
+            {
+                new FilterParameter(nameof(Model.CategoryProductSearchModel.CategoryId), Model.CategoryProductSearchModel.CategoryId)
+            },
+            ColumnCollection = new List<ColumnProperty>
+            {
+                new ColumnProperty(nameof(CategoryProductModel.ProductName))
+                {
+                    Title = T("Admin.Catalog.Categories.Products.Fields.Product").Text
+                },
+                new ColumnProperty(nameof(CategoryProductModel.IsFeaturedProduct))
+                {
+                    Title = T("Admin.Catalog.Categories.Products.Fields.IsFeaturedProduct").Text,
+                    Width = "150",
+                    ClassName = StyleColumn.CenterAll,
+                    Render = new RenderBoolean()
+                },
+                new ColumnProperty(nameof(CategoryProductModel.DisplayOrder))
+                {
+                    Title = T("Admin.Catalog.Categories.Products.Fields.DisplayOrder").Text,
+                    Width = "150"
+                },
+                new ColumnProperty(nameof(CategoryProductModel.Id))
+                {
+                    Title = T("Admin.Common.View").Text,
+                    Width = "150",
+                    ClassName = StyleColumn.ButtonStyle,
+                    Render = new RenderButtonView(new DataUrl("~/Admin/Product/Edit/", nameof(CategoryProductModel.ProductId)))
+                },
+                new ColumnProperty(nameof(CategoryProductModel.Id))
+                {
+                    Title = T("Admin.Common.Edit").Text,
+                    Width = "100",
+                    ClassName =  StyleColumn.ButtonStyle,
+                    Render = new RenderButtonEdit(new DataUrl("Edit"))
+                },
+                new ColumnProperty(nameof(CategoryProductModel.Id))
+                {
+                    Title = T("Admin.Common.Delete").Text,
+                    Width = "100",
+                    Render = new RenderButtonRemove(T("Admin.Common.Delete").Text){ Style = StyleButton.Default },
+                    ClassName = StyleColumn.ButtonStyle
+                }
+            }
+        })*@
 </div>
     <div class="panel-footer">
         <button type="submit" id="btnAddNewProduct"
@@ -73,8 +290,8 @@
                     return false;
                 });
             });
-        </script>
-    </div>
+    </script>
+</div>
 }
 else
 {
