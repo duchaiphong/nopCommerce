@@ -19,14 +19,16 @@
         //get Table and Columns properties
         function getTableMeta() {
             data = {
-                "Column": [{ "Name": "@nameof(CategoryProductModel.ProductName)", "Editable": true, "Searchable": true, "Class": "@nameof(CategoryProductModel.ProductName)" },
-                    { "Name": "@nameof(CategoryProductModel.IsFeaturedProduct)", "Editable": true, "Searchable": true, "Class": "@nameof(CategoryProductModel.IsFeaturedProduct)" },
-                    { "Name": "@nameof(CategoryProductModel.DisplayOrder)", "Editable": true, "Searchable": true, "Class": "@nameof(CategoryProductModel.DisplayOrder)" },
+                "Column": [{ "Name": "@nameof(CategoryProductModel.ProductName)", "Editable": false, "Searchable": true, "Class": "@nameof(CategoryProductModel.ProductName)" },
+                    { "Name": "@nameof(CategoryProductModel.IsFeaturedProduct)", "Editable": true, "Type": "checkbox", "Searchable": true, "Class": "@nameof(CategoryProductModel.IsFeaturedProduct)" },
+                    { "Name": "@nameof(CategoryProductModel.DisplayOrder)", "Editable": true, "Type":"number", "Searchable": true, "Class": "@nameof(CategoryProductModel.DisplayOrder)" },
                     { "Name": "@nameof(CategoryProductModel.ProductId)", "Editable": false, "Searchable": false, "Class": "@nameof(CategoryProductModel.ProductId)" },
                     { "Name": "@nameof(CategoryProductModel.Id)", "Editable": false, "Searchable": false, "Class": "@nameof(CategoryProductModel.Id)" }],
                 "Name": "TableNameHere"
             }
+
             console.log(data);
+
             ColumnData = data.Column;
             $.each(data.Column, function (index, element) {
                 $('#dtexample thead tr:first-child').append($('<th>', {
@@ -102,17 +104,53 @@
             $.each(ColumnData, function (index, element) {
                 if (element.Editable == true) {
                     onEditClickcls += 'tr td.' + element.Name + ',';
+
+                    //if (element.Type == 'number') {
+                    //    $(onEditClickcls).editable(function (value, settings) {
+                    //        console.log(this);
+                    //        console.log(value);
+                    //        console.log(settings);
+                    //        return (value);
+                    //    }, {
+                    //            type: "number",
+                    //            tooltip: "Click to edit: number",
+                    //            placeholder: "0",
+                    //            min: 0,
+                    //            max: 10,
+                    //            step: 1
+                    //        });
+                    //}
+                    //if (element.Type == 'checkbox') {
+                    //    $(onEditClickcls).editable(function (value, settings) {
+                    //        console.log(this);
+                    //        console.log(value);
+                    //        console.log(settings);
+                    //        return (value);
+                    //    }, {
+                    //            type: "checkbox",
+                    //            submit: 'ok'
+                    //        });
+                    //}
+                    
+
+                    //Доступ к редактируемуму элементу
+                    console.log(element);
                 }
             });
             onEditClickcls = onEditClickcls.substring(0, onEditClickcls.length - 1);
+
+            //редактируемые ячейки
             console.log(onEditClickcls);
+
             $("#dtexample tbody").on('click', onEditClickcls, function (e) {
                 if ($(e.target).is('input') || $(e.target).is('img') || $(e.target).is('span.copyAll')) {
                     e.preventDefault();
                     return;
                 }
+
                 RoweditMode($(this).parent());
             });
+
             $("#dtexample tbody").on('keyup', 'input.userinput', function (e) {
                 if (e.keyCode == 35) {
                     console.log('Нажата кнопка END');
@@ -121,14 +159,14 @@
             });
         }
         var editIndexTable = -1;
-        function RoweditMode(rowid) {
+        function RoweditMode(rowid) {            
             var prevRow;
-            var rowIndexVlaue = parseInt(rowid.attr("indexv"));
+            var rowIndexVlaue = parseInt(rowid[0].rowIndex);
             if (editIndexTable == -1) {
                 saveRowIntoArray(rowid);
                 rowid.attr("editState", "editState");
                 editIndexTable = rowid.rowIndex;
-                setEditStateValue(rowid, rowIndexVlaue + 2);
+                setEditStateValue(rowid, rowIndexVlaue);
             }
             else {
                 prevRow = $("[editState=editState]");
@@ -137,14 +175,67 @@
                 editIndexTable = rowIndexVlaue;
                 saveArrayIntoRow(prevRow);
                 saveRowIntoArray(rowid);
-                setEditStateValue(rowid, rowIndexVlaue + 2);
+                setEditStateValue(rowid, rowIndexVlaue);
             }
         }
         function setEditStateValue(td1, indexRow) {
             for (var k in EditRowData) {
-                $($(td1).children('.' + k)[0]).html('<input value="' + EditRowData[k] + '" class="userinput"  style="width: 99% " />');
+
+                var columnType = 'number';
+                $.each(ColumnData, function (index, element) {
+                    
+                    if (element.Name == k) {
+                        console.log(element.Name);
+                        console.log(td1, '!!!');
+                        columnType = element.Type;
+                    }
+
+                });
+
+                if (columnType == 'number') {
+                    $($(td1).children('.' + k)[0]).html('<input value="' + EditRowData[k] + '" class="userinput" type="number" min="0" max="100"/>');
+                }
+                if (columnType == 'checkbox') {
+                    $($(td1).children('.' + k)[0]).html('<input value="' + EditRowData[k] + '" class="userinput" type="checkbox" onclick="checkBoxClick(this)"/>');
+                    //$($(td1).children('.' + k)[0]).html('<input value="' + EditRowData[k] + '" class="userinput" type="checkbox" style="width: 99% " />');
+                }
+                
             }
         }
+
+        //$("#dtexample tbody").on('click', 'input.userinput', function (e) {
+        //    console.log(e);
+        //    console.log($(e.target.value));
+        //});
+
+        function checkBoxClick(checkBox) {
+            var input = $(checkBox);
+
+            if ($(input).val() === 'true') {
+                $(input).val('false');
+                $(input).removeAttr('checked');
+            } else {
+                $(input).val('true');
+                $(input).attr('checked', 'checked');
+            }
+
+            console.log($(checkBox));
+
+            //console.log(checkBox);
+            //console.log(checkBox.checked);
+
+            //if ($(checkBox).prop('checked')) {
+            //    checkBox.value = 'true'
+            //}
+            //else {
+            //    checkBox.value = 'false'
+            //}
+            //console.log(checkBox.checked);
+        }
+
+
+
+
         function cancelBtn() {
             var prevRow = $("[editState=editState]");
             prevRow.attr("editState", "");
@@ -183,21 +274,20 @@
             var postData = {};
             for (i = 0; i < UpdateRowData.length; i++) {
                 if (UpdateRowData[i].pname == 'Id') {
-                    //postData.push({ name: 'ProductId', value: UpdateRowData[i].pvalue });
-                    postData['ProductId'] = UpdateRowData[i].pvalue;
-                    DataId = UpdateRowData[i].pvalue;
+                    //postData['ProductId'] = UpdateRowData[i].pvalue;
+                    //DataId = UpdateRowData[i].pvalue;
                 }
-                postData[UpdateRowData[i].pname] = UpdateRowData[i].pvalue;
-                //postData.push({ name: UpdateRowData[i].pname, value: UpdateRowData[i].pvalue });
+                //postData[UpdateRowData[i].pname] = UpdateRowData[i].pvalue;
 
+                //передаваемые параметры
+                console.log(postData[UpdateRowData[i].pname] + '==' + UpdateRowData[i].pvalue);
             }
 
-            postData['CategoryId'] = 3;
+            //postData['CategoryId'] = 7;
             //postData.push({ name: 'CategoryId', value: 7 });
 
 
             var tokenInput = $('input[name=__RequestVerificationToken]').val();
-            //postData.push({ name: '__RequestVerificationToken', value: tokenInput });
             postData['__RequestVerificationToken'] = tokenInput;
 
             addAntiForgeryToken(postData);
